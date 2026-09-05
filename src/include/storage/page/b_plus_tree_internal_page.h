@@ -55,18 +55,30 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   auto KeyAt(int index) const -> KeyType;
 
   void SetKeyAt(int index, const KeyType &key);
-
+  void InitRoot(
+    const ValueType &left_value,
+    const KeyType &separator,
+    const ValueType &right_value);
   /**
    * @param value The value to search for
    * @return The index that corresponds to the specified value
    */
   auto ValueIndex(const ValueType &value) const -> int;
+  void InsertAfter(
+    const ValueType &old_value,
+    const KeyType &new_key,
+    const ValueType &new_value);
 
   auto ValueAt(int index) const -> ValueType;
   auto Lookup(
     const KeyType &key,
     const KeyComparator &comparator) const -> ValueType;
 
+  auto SplitAndInsert(
+    BPlusTreeInternalPage &right,
+    const ValueType &old_value,
+    const KeyType &new_key,
+    const ValueType &new_value) -> KeyType;
 
   /**
    * @brief For test only, return a string representing all keys in

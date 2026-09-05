@@ -32,7 +32,7 @@ namespace bustub {
 enum class LeafInsertStatus {
   INSERTED,
   DUPLICATE,
-  NEED_SPLIT,
+  INSERTED_NEED_SPLIT,
 };
 /**
  * Store indexed key and record id(record id = page id combined with slot id,
@@ -85,12 +85,9 @@ class BPlusTreeLeafPage : public BPlusTreePage {
     const KeyType &key,
     const KeyComparator &comparator) const -> int;
   auto TryInsert(const KeyType &key,const ValueType &value,KeyComparator &comparator) -> LeafInsertStatus;
-  auto SplitAndInsert(
+  auto Split(
     BPlusTreeLeafPage &right,
-    page_id_t right_page_id,
-    const KeyType &key,
-    const ValueType &value,
-    const KeyComparator &comparator) -> KeyType;
+    page_id_t right_page_id) -> KeyType;
 
   /**
    * @brief for test only return a string representing all keys in

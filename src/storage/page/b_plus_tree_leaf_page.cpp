@@ -125,6 +125,8 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(
 
 template<typename KeyType, typename ValueType, typename KeyComparator, ssize_t NumTombs>
 auto BPlusTreeLeafPage<KeyType, ValueType, KeyComparator, NumTombs>::TryInsert(const KeyType &key, const ValueType &value, KeyComparator &comparator) -> LeafInsertStatus {
+  BUSTUB_ASSERT(GetSize() < GetMaxSize(),
+                "cannot insert into an overflowing leaf page");
   auto index = KeyIndex(key, comparator);
   if (index < GetSize()&& comparator(key_array_[index], key) == 0){
     if (IsTombstone(index)) {
@@ -145,36 +147,70 @@ auto BPlusTreeLeafPage<KeyType, ValueType, KeyComparator, NumTombs>::TryInsert(c
     return LeafInsertStatus::DUPLICATE;
   }
 
-  if (GetSize() == GetMaxSize()) {
-    return LeafInsertStatus::NEED_SPLIT;
-  }
-  for (size_t i = GetSize(); i > index; i--) {
+  // if (GetSize() == GetMaxSize()) {
+  //   return LeafInsertStatus::NEED_SPLIT;
+  // }
+  BUSTUB_ASSERT(GetSize() < GetMaxSize(), "cannot insert into a full leaf page");
+  for (int i = GetSize(); i > index; i--) {
     key_array_[i] = key_array_[i - 1];
     rid_array_[i] = rid_array_[i - 1];
   }
   key_array_[index] = key;
   rid_array_[index] = value;
   ChangeSizeBy(1);
+  const auto insert_index = static_cast<size_t>(index);
   for (size_t i = 0; i < num_tombstones_; i++) {
-    if (tombstones_[i] > index) {
+    if (tombstones_[i] >= insert_index) {
       ++tombstones_[i];
     }
   }
+  if (GetSize() == GetMaxSize()) {
+    return LeafInsertStatus::INSERTED_NEED_SPLIT;
+  }
+
   return LeafInsertStatus::INSERTED;
 
 }
 
 FULL_INDEX_TEMPLATE_ARGUMENTS
-auto B_PLUS_TREE_LEAF_PAGE_TYPE::SplitAndInsert(
+auto B_PLUS_TREE_LEAF_PAGE_TYPE::Split(
   BPlusTreeLeafPage &right,
-  page_id_t right_page_id,
-  const KeyType &key,
-  const ValueType &value,
-  const KeyComparator &comparator) -> KeyType {
+  page_id_t right_page_id) -> KeyType {
+  const int total_size = GetSize();
 
-  auto index = KeyIndex(key, comparator);
-  if (  )
 
+  const int left_size = total_size / 2;
+  const int right_size = total_size - left_size;
+
+  const size_t old_tombstone_count = num_tombstones_;
+  size_t left_tombstone_count = 0;
+  size_t right_tombstone_count = 0;
+
+  for (size_t i = 0; i < old_tombstone_count; i++) {
+    const size_t old_index = tombstones_[i];
+
+    if (old_index < static_cast<size_t>(left_size)) {
+      tombstones_[left_tombstone_count++] = old_index;
+    } else {
+      right.tombstones_[right_tombstone_count++] =
+          old_index - left_size;
+    }
+  }
+
+  num_tombstones_ = left_tombstone_count;
+  right.num_tombstones_ = right_tombstone_count;
+
+  for (int i = 0; i < right_size; i++) {
+    right.key_array_[i] = key_array_[left_size + i];
+    right.rid_array_[i] = rid_array_[left_size + i];
+  }
+  //更新大小
+  SetSize(left_size);
+  right.SetSize(right_size);
+
+  right.SetNextPageId(this->GetNextPageId());
+  this->SetNextPageId(right_page_id);
+  return right.KeyAt(0);
 }
 
 

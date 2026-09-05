@@ -74,7 +74,7 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
       break;
     }
     const auto *internal = ctx.read_set_.back().As<InternalPage>();
-    const page_id_t child_id = internal->Lookup(key,comparator_)
+    const page_id_t child_id = internal->Lookup(key,comparator_);
     BUSTUB_ASSERT(child_id != INVALID_PAGE_ID, "child_id is not valid");
     auto child_guard = bpm_->ReadPage(child_id);
     ctx.read_set_.pop_back();
@@ -124,30 +124,106 @@ auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value) -> bool 
     return false;
   }
   ctx.write_set_.push_back(bpm_->WritePage(header->root_page_id_));
-  header_guard.Drop();
+  ctx.root_page_id_ = header->root_page_id_;
+  ctx.header_page_.emplace(std::move(header_guard));
   while (true) {
     const auto *page = ctx.write_set_.back().As<BPlusTreePage>();
     if (page->IsLeafPage()) {
       break;
     }
     const auto *internal = ctx.write_set_.back().As<InternalPage>();
-    const page_id_t child_id = internal->Lookup(key,comparator_)
+    const page_id_t child_id = internal->Lookup(key,comparator_);
     BUSTUB_ASSERT(child_id != INVALID_PAGE_ID, "child_id is not valid");
     auto child_guard = bpm_->WritePage(child_id);
+    ctx.write_set_.push_back(std::move(child_guard));
   }
   auto *leaf = ctx.write_set_.back().AsMut<LeafPage>();
+
   auto insert_result = leaf->TryInsert(key, value, comparator_);
   if (insert_result == LeafInsertStatus::INSERTED) {
+
     return true;
   }
   if (insert_result == LeafInsertStatus::DUPLICATE) {
     return false;
   }
-  if (insert_result == LeafInsertStatus::NEED_SPLIT) {
 
+  BUSTUB_ASSERT(insert_result == LeafInsertStatus::INSERTED_NEED_SPLIT, "unexpected leaf insertion status");
+
+  // key 已在原叶节点中，现在分裂
+  {
+    page_id_t left_page_id =
+        ctx.write_set_.back().GetPageId();
+
+    page_id_t right_page_id = bpm_->NewPage();
+    auto right_guard = bpm_->WritePage(right_page_id);
+    auto *right = right_guard.AsMut<LeafPage>();
+
+    right->Init(leaf_max_size_);
+
+    KeyType separator =
+        leaf->Split(*right, right_page_id);
+
+    while (true) {
+      // 情况一：刚刚分裂的是根
+      if (ctx.IsRootPage(left_page_id)) {
+        const page_id_t new_root_page_id = bpm_->NewPage();
+        auto new_root_guard = bpm_->WritePage(new_root_page_id);
+        auto *new_root = new_root_guard.AsMut<InternalPage>();
+
+        new_root->Init(internal_max_size_);
+        new_root->InitRoot(
+            left_page_id,
+            separator,
+            right_page_id);
+
+        ctx.header_page_->AsMut<BPlusTreeHeaderPage>()
+            ->root_page_id_ = new_root_page_id;
+
+        return true;
+      }
+
+      // 当前 back() 是刚刚分裂的左节点，将它移除后得到父节点
+      ctx.write_set_.pop_back();
+
+      const page_id_t parent_page_id =
+          ctx.write_set_.back().GetPageId();
+
+      auto *parent =
+          ctx.write_set_.back().AsMut<InternalPage>();
+
+      // 情况二：父节点还有空间
+      if (parent->GetSize() < parent->GetMaxSize()) {
+        parent->InsertAfter(
+            left_page_id,
+            separator,
+            right_page_id);
+        return true;
+      }
+
+      // 情况三：父节点也满了
+      const page_id_t new_right_page_id = bpm_->NewPage();
+      auto new_right_guard =
+          bpm_->WritePage(new_right_page_id);
+
+      auto *new_right =
+          new_right_guard.AsMut<InternalPage>();
+
+      new_right->Init(internal_max_size_);
+
+      KeyType promoted_key =
+          parent->SplitAndInsert(
+              *new_right,
+              left_page_id,
+              separator,
+              right_page_id);
+
+      // 将父节点分裂结果变成下一轮待插入的信息
+      left_page_id = parent_page_id;
+      separator = promoted_key;
+      right_page_id = new_right_page_id;
+    }
   }
-
-
 }
 /*****************************************************************************
  * REMOVE
@@ -204,7 +280,10 @@ auto BPLUSTREE_TYPE::End() -> INDEXITERATOR_TYPE { UNIMPLEMENTED("TODO(P2): Add 
  * You may want to implement this while implementing Task #3.
  */
 FULL_INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::GetRootPageId() -> page_id_t { UNIMPLEMENTED("TODO(P2): Add implementation."); }
+auto BPLUSTREE_TYPE::GetRootPageId() -> page_id_t {
+  auto header_guard = bpm_->ReadPage(header_page_id_);
+  return header_guard.As<BPlusTreeHeaderPage>()->root_page_id_;
+}
 
 template class BPlusTree<GenericKey<4>, RID, GenericComparator<4>>;
 
