@@ -17,9 +17,9 @@
 #include "storage/page/b_plus_tree_internal_page.h"
 
 namespace bustub {
-/*****************************************************************************
- * HELPER METHODS AND UTILITIES
- *****************************************************************************/
+/********************************
+ * HELPER METHODS AND UTILITIES *
+ ********************************/
 
 /**
  * @brief Init method after creating a new internal page.
@@ -31,7 +31,11 @@ namespace bustub {
  * @param max_size Maximal size of the page
  */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(int max_size) { UNIMPLEMENTED("TODO(P2): Add implementation."); }
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(int max_size) {
+  this->SetPageType(IndexPageType::INTERNAL_PAGE);
+  this->SetMaxSize(max_size);
+  this->SetSize(0);
+}
 
 /**
  * @brief Helper method to get/set the key associated with input "index"(a.k.a
@@ -42,7 +46,9 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(int max_size) { UNIMPLEMENTED("TODO(P2
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::KeyAt(int index) const -> KeyType {
-  UNIMPLEMENTED("TODO(P2): Add implementation.");
+  BUSTUB_ASSERT(index > 0 && index < GetSize(),
+              "internal page key index out of range");
+  return key_array_[index];
 }
 
 /**
@@ -53,7 +59,9 @@ auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::KeyAt(int index) const -> KeyType {
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetKeyAt(int index, const KeyType &key) {
-  UNIMPLEMENTED("TODO(P2): Add implementation.");
+  BUSTUB_ASSERT(index > 0 && index < GetSize(),
+              "internal page key index out of range");
+  key_array_[index] = key;
 }
 
 /**
@@ -65,9 +73,32 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetKeyAt(int index, const KeyType &key) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueAt(int index) const -> ValueType {
-  UNIMPLEMENTED("TODO(P2): Add implementation.");
+    BUSTUB_ASSERT(index >= 0 && index < GetSize(),
+                "internal page key index out of range");
+    return this->page_id_array_[index];
 }
+    INDEX_TEMPLATE_ARGUMENTS
+    auto B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(
+        const KeyType &key,
+        const KeyComparator &comparator) const -> ValueType {
+    BUSTUB_ASSERT(GetSize() > 0,
+                  "cannot lookup an empty internal page");
 
+    int left = 1;
+    int right = GetSize();
+
+    while (left < right) {
+        const int mid = left + (right - left) / 2;
+
+        if (comparator(key, KeyAt(mid)) < 0) {
+            right = mid;
+        } else {
+            left = mid + 1;
+        }
+    }
+
+    return ValueAt(left - 1);
+}
 // valuetype for internalNode should be page id_t
 template class BPlusTreeInternalPage<GenericKey<4>, page_id_t, GenericComparator<4>>;
 template class BPlusTreeInternalPage<GenericKey<8>, page_id_t, GenericComparator<8>>;

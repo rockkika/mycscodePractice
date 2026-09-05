@@ -122,6 +122,7 @@ class BPlusTree {
   std::shared_ptr<TracedBufferPoolManager> bpm_;
 
  private:
+
   void ToGraph(page_id_t page_id, const BPlusTreePage *page, std::ofstream &out);
 
   void PrintTree(page_id_t page_id, const BPlusTreePage *page);

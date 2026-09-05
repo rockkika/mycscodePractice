@@ -63,6 +63,10 @@ class BPlusTreeInternalPage : public BPlusTreePage {
   auto ValueIndex(const ValueType &value) const -> int;
 
   auto ValueAt(int index) const -> ValueType;
+  auto Lookup(
+    const KeyType &key,
+    const KeyComparator &comparator) const -> ValueType;
+
 
   /**
    * @brief For test only, return a string representing all keys in

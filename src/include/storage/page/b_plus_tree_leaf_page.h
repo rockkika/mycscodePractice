@@ -28,6 +28,12 @@ namespace bustub {
   ((BUSTUB_PAGE_SIZE - LEAF_PAGE_HEADER_SIZE - sizeof(size_t) - (LEAF_PAGE_TOMB_CNT * sizeof(size_t))) / \
    (sizeof(KeyType) + sizeof(ValueType)))  // NOLINT
 
+
+enum class LeafInsertStatus {
+  INSERTED,
+  DUPLICATE,
+  NEED_SPLIT,
+};
 /**
  * Store indexed key and record id(record id = page id combined with slot id,
  * see include/common/rid.h for detailed implementation) together within leaf
@@ -73,6 +79,18 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   auto GetNextPageId() const -> page_id_t;
   void SetNextPageId(page_id_t next_page_id);
   auto KeyAt(int index) const -> KeyType;
+  auto ValueAt(int index) const -> ValueType;
+  auto IsTombstone(int index) const -> bool;
+  auto KeyIndex(
+    const KeyType &key,
+    const KeyComparator &comparator) const -> int;
+  auto TryInsert(const KeyType &key,const ValueType &value,KeyComparator &comparator) -> LeafInsertStatus;
+  auto SplitAndInsert(
+    BPlusTreeLeafPage &right,
+    page_id_t right_page_id,
+    const KeyType &key,
+    const ValueType &value,
+    const KeyComparator &comparator) -> KeyType;
 
   /**
    * @brief for test only return a string representing all keys in
@@ -118,6 +136,7 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   KeyType key_array_[LEAF_PAGE_SLOT_CNT];
   ValueType rid_array_[LEAF_PAGE_SLOT_CNT];
   // (Spring 2025) Feel free to add more fields and helper functions below if needed
+
 };
 
 }  // namespace bustub

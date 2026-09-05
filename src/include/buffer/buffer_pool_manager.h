@@ -17,6 +17,7 @@
 #include <shared_mutex>
 #include <unordered_map>
 #include <vector>
+#include <optional>
 
 #include "buffer/arc_replacer.h"
 #include "common/config.h"
@@ -77,6 +78,8 @@ class FrameHeader {
 
   /** @brief The number of pins on this frame keeping the page in memory. */
   std::atomic<size_t> pin_count_;
+
+  std::optional<page_id_t> page_id_{std::nullopt};
 
   /** @brief The dirty flag. */
   bool is_dirty_;
@@ -162,6 +165,7 @@ class BufferPoolManager {
    */
   LogManager *log_manager_ __attribute__((__unused__));
 
+  auto GetAvailableFrame() -> std::optional<frame_id_t>;
   /**
    * TODO(P1): You may add additional private members and helper functions if you find them necessary.
    *

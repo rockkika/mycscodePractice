@@ -26,7 +26,7 @@ BPLUSTREE_TYPE::BPlusTree(std::string name, page_id_t header_page_id, BufferPool
       internal_max_size_(internal_max_size),
       header_page_id_(header_page_id) {
   WritePageGuard guard = bpm_->WritePage(header_page_id_);
-  auto root_page = guard.AsMut<BPlusTreeHeaderPage>();
+  const auto root_page = guard.AsMut<BPlusTreeHeaderPage>();
   root_page->root_page_id_ = INVALID_PAGE_ID;
 }
 
@@ -35,7 +35,13 @@ BPLUSTREE_TYPE::BPlusTree(std::string name, page_id_t header_page_id, BufferPool
  * @return Returns true if this B+ tree has no keys and values.
  */
 FULL_INDEX_TEMPLATE_ARGUMENTS
-auto BPLUSTREE_TYPE::IsEmpty() const -> bool { UNIMPLEMENTED("TODO(P2): Add implementation."); }
+auto BPLUSTREE_TYPE::IsEmpty() const -> bool {
+  auto header_guard = bpm_->ReadPage(header_page_id_);
+  const auto *header =
+      header_guard.As<BPlusTreeHeaderPage>();
+
+  return header->root_page_id_ == INVALID_PAGE_ID;
+}
 
 /*****************************************************************************
  * SEARCH
@@ -51,10 +57,42 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool { UNIMPLEMENTED("TODO(P2): Add impl
  */
 FULL_INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result) -> bool {
-  UNIMPLEMENTED("TODO(P2): Add implementation.");
   // Declaration of context instance. Using the Context is not necessary but advised.
   Context ctx;
+  auto header_guard = bpm_->ReadPage(header_page_id_);
+  const auto *header =
+      header_guard.As<BPlusTreeHeaderPage>();
+
+  if (header->root_page_id_ == INVALID_PAGE_ID) {
+    return false;
+  }
+  ctx.read_set_.push_back(bpm_->ReadPage(header->root_page_id_));
+  header_guard.Drop();
+  while (true) {
+    const auto *page = ctx.read_set_.back().As<BPlusTreePage>();
+    if (page->IsLeafPage()) {
+      break;
+    }
+    const auto *internal = ctx.read_set_.back().As<InternalPage>();
+    const page_id_t child_id = internal->Lookup(key,comparator_)
+    BUSTUB_ASSERT(child_id != INVALID_PAGE_ID, "child_id is not valid");
+    auto child_guard = bpm_->ReadPage(child_id);
+    ctx.read_set_.pop_back();
+    ctx.read_set_.push_back(std::move(child_guard));
+  }
+  const auto *leaf = ctx.read_set_.back().As<LeafPage>();
+  int left = leaf->KeyIndex(key,comparator_);
+  if (left == leaf->GetSize() ||
+      comparator_(leaf->KeyAt(left), key) != 0 ||
+      leaf->IsTombstone(left)) {
+    return false;
+      }
+
+  result->push_back(leaf->ValueAt(left));
+  return true;
 }
+
+
 
 /*****************************************************************************
  * INSERTION
@@ -72,11 +110,45 @@ auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result
  */
 FULL_INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value) -> bool {
-  UNIMPLEMENTED("TODO(P2): Add implementation.");
-  // Declaration of context instance. Using the Context is not necessary but advised.
   Context ctx;
-}
+  auto header_guard = bpm_->WritePage(header_page_id_);
+  auto *header = header_guard.AsMut<BPlusTreeHeaderPage>();
+  if (header->root_page_id_ == INVALID_PAGE_ID) {
+    header->root_page_id_ = bpm_->NewPage();
+    auto leaf_guard = bpm_->WritePage(header->root_page_id_);
+    auto *leaf = leaf_guard.AsMut<LeafPage>();
+    leaf->Init(leaf_max_size_);
+    if (leaf->TryInsert(key,value,comparator_) == LeafInsertStatus::INSERTED) {
+      return true;
+    }
+    return false;
+  }
+  ctx.write_set_.push_back(bpm_->WritePage(header->root_page_id_));
+  header_guard.Drop();
+  while (true) {
+    const auto *page = ctx.write_set_.back().As<BPlusTreePage>();
+    if (page->IsLeafPage()) {
+      break;
+    }
+    const auto *internal = ctx.write_set_.back().As<InternalPage>();
+    const page_id_t child_id = internal->Lookup(key,comparator_)
+    BUSTUB_ASSERT(child_id != INVALID_PAGE_ID, "child_id is not valid");
+    auto child_guard = bpm_->WritePage(child_id);
+  }
+  auto *leaf = ctx.write_set_.back().AsMut<LeafPage>();
+  auto insert_result = leaf->TryInsert(key, value, comparator_);
+  if (insert_result == LeafInsertStatus::INSERTED) {
+    return true;
+  }
+  if (insert_result == LeafInsertStatus::DUPLICATE) {
+    return false;
+  }
+  if (insert_result == LeafInsertStatus::NEED_SPLIT) {
 
+  }
+
+
+}
 /*****************************************************************************
  * REMOVE
  *****************************************************************************/
