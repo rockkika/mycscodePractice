@@ -28,7 +28,6 @@ namespace bustub {
   ((BUSTUB_PAGE_SIZE - LEAF_PAGE_HEADER_SIZE - sizeof(size_t) - (LEAF_PAGE_TOMB_CNT * sizeof(size_t))) / \
    (sizeof(KeyType) + sizeof(ValueType)))  // NOLINT
 
-
 enum class LeafInsertStatus {
   INSERTED,
   DUPLICATE,
@@ -80,14 +79,16 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   void SetNextPageId(page_id_t next_page_id);
   auto KeyAt(int index) const -> KeyType;
   auto ValueAt(int index) const -> ValueType;
+  auto GetItem(int index) const -> std::pair<const KeyType &, const ValueType &>;
   auto IsTombstone(int index) const -> bool;
-  auto KeyIndex(
-    const KeyType &key,
-    const KeyComparator &comparator) const -> int;
-  auto TryInsert(const KeyType &key,const ValueType &value,KeyComparator &comparator) -> LeafInsertStatus;
-  auto Split(
-    BPlusTreeLeafPage &right,
-    page_id_t right_page_id) -> KeyType;
+  auto KeyIndex(const KeyType &key, const KeyComparator &comparator) const -> int;
+  auto TryInsert(const KeyType &key, const ValueType &value, KeyComparator &comparator) -> LeafInsertStatus;
+  auto TryRemove(const KeyType &key, const KeyComparator &comparator) -> bool;
+  void RemoveAt(int index);
+  auto Split(BPlusTreeLeafPage &right, page_id_t right_page_id) -> KeyType;
+  void MoveFirstToEndOf(BPlusTreeLeafPage &recipient, const KeyComparator &comparator);
+  void MoveLastToFrontOf(BPlusTreeLeafPage &recipient, const KeyComparator &comparator);
+  void MoveAllTo(BPlusTreeLeafPage &recipient, const KeyComparator &comparator);
 
   /**
    * @brief for test only return a string representing all keys in
@@ -125,6 +126,8 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   }
 
  private:
+  void RebuildTombstones(const std::vector<KeyType> &ordered_tombstones, const KeyComparator &comparator);
+
   page_id_t next_page_id_;
   size_t num_tombstones_;
   // Fixed-size tombstone buffer (indexes into key_array_ / rid_array_).
@@ -133,7 +136,6 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   KeyType key_array_[LEAF_PAGE_SLOT_CNT];
   ValueType rid_array_[LEAF_PAGE_SLOT_CNT];
   // (Spring 2025) Feel free to add more fields and helper functions below if needed
-
 };
 
 }  // namespace bustub
